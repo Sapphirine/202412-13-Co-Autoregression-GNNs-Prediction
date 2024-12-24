@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pyspark GAT!</title>
+    <script type="text/javascript">
+        'use strict';
+        const loss_task = async () => {
+            while (true) {
+                const loss = await (await fetch('/draw_loss')).json();
+                const loss_container = document.getElementById('loss_container');
+                loss_container.innerHTML = loss.img;
+                await new Promise((r, _) => { setTimeout(r, 500) });
+            }
+        };
+        let labels = [];
+        const plot_task = async () => {
+            while (true) {
+                if (labels.length === 0) {
+                    await new Promise((r, _) => { setTimeout(r, 500) });
+                    continue;
+                }
+                const columns = [];
+                for (const span of labels) {
+                    if (span.children[0].children[0].checked) {
+                        columns.push(span.children[0].children[0].value);
+                    }
+                }
+                const plot = await (await fetch('/draw_plot', {
+                    'method': 'POST',
+                    'body': JSON.stringify({ 'columns': columns }),
+                    'headers': {
+                        'Content-Type': 'application/json'
+                    }
+                })).json()
+                const plot_container = document.getElementById('plot_container');
+                plot_container.innerHTML = plot.img;
+                await new Promise((r, _) => { setTimeout(r, 500) });
+            }
+        }
+        const heat_task = async () => {
+            while (true) {
+                if (labels.length === 0) {
+                    await new Promise((r, _) => { setTimeout(r, 500) });
+                    continue;
+                }
+                const columns = [];
+                for (const span of labels) {
+                    if (span.children[0].children[0].checked) {
+                        columns.push(span.children[0].children[0].value);
+                    }
+                }
+                const heat = await (await fetch('/draw_heat', {
+                    'method': 'POST',
+                    'body': JSON.stringify({ 'columns': columns }),
+                    'headers': {
+                        'Content-Type': 'application/json'
+                    }
+                })).json()
+                const heat_container = document.getElementById('heat_container');
+                heat_container.innerHTML = heat.img;
+                await new Promise((r, _) => { setTimeout(r, 500) });
+            }
+        }
+        window.addEventListener('load', async () => {
+            loss_task();
+            plot_task();
+            heat_task();
+            while (true) {
+                const status = await (await fetch('/status')).json();
+                const select = document.getElementById('select');
+                if (labels.length === 0) {
+                    const tbody = document.createElement('tbody');
+                    let tr = document.createElement('tr');
+                    const td = document.createElement('td');
+                    const label = document.createElement('label');
+                    const input = document.createElement('input');
+                    const span = document.createElement('span');
+                    select.appendChild(tbody);
+                    tbody.appendChild(tr);
+                    tr.appendChild(td);
+                    input.type = 'checkbox';
+                    input.name = 'All';
+                    input.value = 'All';
+                    input.checked = true;
+                    span.appendChild(input);
+                    span.append('All');
+                    span.style = "white-space: nowrap; margin: 5px";
+                    label.appendChild(span);
+                    td.appendChild(label);
+                    input.addEventListener('change', () => {
+                        for (const label of labels) {
+                            label.children[0].children[0].checked = input.checked;
+                        }
+                    });
+                    tr = document.createElement('tr');
+                    tbody.appendChild(tr);
+                    for (const column of status.columns) {
+                        const label = document.createElement('label');
+                        const input = document.createElement('input');
+                        const span = document.createElement('span');
+                        const td = document.createElement('td');
+                        input.type = 'checkbox';
+                        input.name = column;
+                        input.value = column;
+                        input.checked = true;
+                        span.style = "white-space: nowrap; margin: 5px";
+                        span.appendChild(input);
+                        span.append(column + "    ");
+                        label.appendChild(span);
+                        td.appendChild(label);
+                        labels.push(label);
+                        if (tr.children.length == 8) {
+                            tr = document.createElement('tr');
+                            tbody.appendChild(tr);
+                        }
+                        tr.appendChild(td);
+                    }
+                    console.log(labels.length);
+                }
+                console.log(status);
+
+                const pred_tbl = document.getElementById('pred');
+                pred_tbl.innerHTML = '';
+                const thead = document.createElement('thead');
+                const tr = document.createElement('tr');
+                const td = document.createElement('th');
+                td.innerText = 'Month';
+                tr.appendChild(td);
+                for (const i in status.columns) {
+                    if (!labels[i].children[0].children[0].checked) {
+                        continue
+                    }
+                    const td = document.createElement('th');
+                    td.innerText = status.columns[i];
+                    tr.appendChild(td);
+                }
+                thead.appendChild(tr);
+                pred_tbl.appendChild(thead);
+                const tbody = document.createElement('tbody');
+                pred_tbl.appendChild(tbody);
+                var j = 0;
+                for (const arr of status.result.train) {
+                    const tr = document.createElement('tr');
+                    const td = document.createElement('th');
+                    td.innerText = status.times[j];
+                    tr.appendChild(td);
+                    for (const i in arr) {
+                        if (!labels[i].children[0].children[0].checked) {
+                            continue
+                        }
+                        const td = document.createElement('td');
+                        td.innerHTML = status.truth[j][i].toLocaleString();
+                        td.innerHTML += '<br>';
+                        td.innerHTML += '(' + Math.round(arr[i]).toLocaleString() + ')';
+                        tr.appendChild(td);
+                    }
+                    j += 1;
+                    tbody.appendChild(tr);
+                }
+                for (const arr of status.result.test) {
+                    const tr = document.createElement('tr');
+                    const td = document.createElement('th');
+                    td.innerText = status.times[j];
+                    tr.appendChild(td);
+                    for (const i in arr) {
+                        if (!labels[i].children[0].children[0].checked) {
+                            continue
+                        }
+                        const td = document.createElement('td');
+                        td.innerHTML += status.truth[j][i].toLocaleString();
+                        td.innerHTML += '<br>';
+                        td.innerHTML += '(' + Math.round(arr[i]).toLocaleString() + ')';
+                        tr.appendChild(td);
+                    }
+                    j += 1;
+                    tbody.appendChild(tr);
+                }
+                for (const arr of status.result.pred) {
+                    const tr = document.createElement('tr');
+                    const td = document.createElement('th');
+                    td.innerText = status.times[j];
+                    tr.appendChild(td);
+                    for (const i in arr) {
+                        if (!labels[i].children[0].children[0].checked) {
+                            continue
+                        }
+                        const td = document.createElement('td');
+                        td.innerHTML = '(' + Math.round(arr[i]).toLocaleString() + ')';
+                        tr.appendChild(td);
+                    }
+                    j += 1;
+                    tbody.appendChild(tr);
+                }
+                await new Promise((r, _) => { setTimeout(r, 500) });
+            }
+        });
+    </script>
+    <style>
+        table#pred>tbody>tr>td,
+        table#pred>tbody>tr>th,
+        table#pred>thead>tr>th {
+            border: 1px solid black;
+            text-align: center;
+            vertical-align: middle;
+            padding-left: 10px;
+            padding-right: 10px;
+            padding-top: 5px;
+            padding-bottom: 5px;
+        }
+
+        table#pred {
+            border-collapse: collapse;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loss_container"></div>
+    <div id="heat_container"></div>
+    <div id="plot_container"></div>
+    <table id="select">
+
+    </table>
+    <table id="pred">
+
+    </table>
+</body>
+
+</html>
